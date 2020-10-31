@@ -9,6 +9,7 @@ import core
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 DEFAULT_IMAGE1_FILEPATH = os.path.join(BASE_DIR, 'resources/test_images/image_Peppers512rgb.png')
+IMAGE_SIZE = (512, 512)
 
 
 def main():
@@ -40,7 +41,7 @@ def main():
         # image1 events
         if event == 'upload_image1_filepath':
             image1 = core.upload_image(values['upload_image1_filepath'])
-            window['image1_element'].update(data=core.image_to_bytes(image1), size=(512, 512))
+            window['image1_element'].update(data=core.image_to_bytes(image1), size=IMAGE_SIZE)
 
             # update working image
             if values['working_image_dropdown'] == 'left':
@@ -52,7 +53,7 @@ def main():
         # image2 events
         elif event == 'upload_image2_filepath':
             image2 = core.upload_image(values['upload_image2_filepath'])
-            window['image2_element'].update(data=core.image_to_bytes(image2), size=(512, 512))
+            window['image2_element'].update(data=core.image_to_bytes(image2), size=IMAGE_SIZE)
 
             # update working image
             if values['working_image_dropdown'] == 'right':
@@ -79,9 +80,33 @@ def main():
         elif event == 'convert_to_grayscale_button':
             method = values['convert_to_grayscale_method_dropdown']
             working_image = core.to_grayscale(working_image, method=method)
-
             window[working_image_element_key].update(
-                data=core.image_to_bytes(working_image), size=(512, 512)
+                data=core.image_to_bytes(working_image), size=IMAGE_SIZE
+            )
+        elif event == 'rgb_to_ycbcr_button':
+            working_image = core.rgb_to_ycbcr(working_image)
+            window[working_image_element_key].update(
+                data=core.image_to_bytes(working_image), size=IMAGE_SIZE
+            )
+        elif event == 'y_button':
+            working_image = core.ycbcr_channel_as_grayscale_image(working_image, channel='Y')
+            window[working_image_element_key].update(
+                data=core.image_to_bytes(working_image), size=IMAGE_SIZE
+            )
+        elif event == 'cb_button':
+            working_image = core.ycbcr_channel_as_grayscale_image(working_image, channel='Cb')
+            window[working_image_element_key].update(
+                data=core.image_to_bytes(working_image), size=IMAGE_SIZE
+            )
+        elif event == 'cr_button':
+            working_image = core.ycbcr_channel_as_grayscale_image(working_image, channel='Cr')
+            window[working_image_element_key].update(
+                data=core.image_to_bytes(working_image), size=IMAGE_SIZE
+            )
+        elif event == 'ycbcr_to_rgb_button':
+            working_image = core.ycbcr_to_rgb(working_image)
+            window[working_image_element_key].update(
+                data=core.image_to_bytes(working_image), size=IMAGE_SIZE
             )
 
         # if working image has changed, update left or right image accordingly
@@ -107,7 +132,7 @@ def setup_image_frame(image_name, default_image):
     image_element = sg.Image(
         data=core.image_to_bytes(default_image),
         key=f'{image_name}_element',
-        size=(512, 512)
+        size=IMAGE_SIZE
     )
     upload_image_button = sg.FileBrowse(
         'Upload image', target=f'upload_{image_name}_filepath'
@@ -140,6 +165,7 @@ def setup_instruments_frame():
     working_image_dropdown = sg.Combo(
         ['left', 'right'], key='working_image_dropdown',
         default_value='left', readonly=True, enable_events=True
+        , pad=(0, 10)
     )
 
     convert_to_grayscale_button = sg.Button(
@@ -150,11 +176,30 @@ def setup_instruments_frame():
         core.TO_GRAYSCALE_METHODS, key='convert_to_grayscale_method_dropdown',
         default_value=core.TO_GRAYSCALE_METHODS[0], readonly=True,
     )
+    convert_to_grayscale_column = sg.Column([
+        [convert_to_grayscale_button],
+        [convert_to_grayscale_text, convert_to_grayscale_method_dropdown],
+    ], pad=(0, 10))
+
+    rgb_to_ycbcr_button = sg.Button(
+        'Convert RGB to YCbCr', key='rgb_to_ycbcr_button'
+    )
+    y_button = sg.Button('Y', key='y_button')
+    cb_button = sg.Button('Cb', key='cb_button')
+    cr_button = sg.Button('Cr', key='cr_button')
+    ycbcr_to_rgb_button = sg.Button(
+        'Convert YCbCr to RGB', key='ycbcr_to_rgb_button'
+    )
+    ycbcr_column = sg.Column([
+        [rgb_to_ycbcr_button],
+        [y_button, cb_button, cr_button],
+        [ycbcr_to_rgb_button]
+    ], pad=(0, 10))
 
     instruments_frame_layout = [
         [working_image_text, working_image_dropdown],
-        [convert_to_grayscale_button],
-        [convert_to_grayscale_text, convert_to_grayscale_method_dropdown],
+        [convert_to_grayscale_column],
+        [ycbcr_column]
     ]
     instruments_frame = sg.Frame('', instruments_frame_layout)
 
@@ -174,7 +219,3 @@ def setup_comparison_frame():
     comparison_frame = sg.Frame('', comparison_frame_layout)
 
     return comparison_frame
-
-
-if __name__ == '__main__':
-    main()

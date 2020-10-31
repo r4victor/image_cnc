@@ -4,12 +4,13 @@ import math
 
 import numpy as np
 import PIL.Image
+from PIL.Image import Image
 
 
 @dataclass
 class ImageState:
-    visible_image: PIL.Image.Image
-    real_image: PIL.Image.Image
+    visible_image: Image
+    real_image: Image
 
 
 def upload_image(filepath: str) -> ImageState:
@@ -26,7 +27,7 @@ def image_to_bytes(image_state: ImageState):
     return _image_to_bytes(image_state.visible_image)
 
 
-def _image_to_bytes(image: PIL.Image.Image) -> bytes:
+def _image_to_bytes(image: Image) -> bytes:
     bio = io.BytesIO()
     image.save(bio, format='PNG')
     return bio.getvalue()
@@ -41,19 +42,19 @@ MODE_DEPTHS = {
     'L': 8,
     'RGB': 8,
 }
-PSNR_SUPPORTED_MODES = set(MODE_DEPTHS.keys())
+PSNR_SUPPORTED_MODES = list(MODE_DEPTHS.keys())
 
 
 def psnr(image_state1: ImageState, image_state2: ImageState) -> float:
     return _psnr(image_state1.real_image, image_state2.real_image)
 
 
-def _psnr(image1: PIL.Image.Image, image2: PIL.Image.Image) -> float:
+def _psnr(image1: Image, image2: Image) -> float:
     for image in (image1, image2):
         if image.mode not in {'L', 'RGB'}:
             raise ValueError(
-                'Cannot calculate PSNR for {image.mode} image mode. '
-                'Supported image modes are: {PSNR_SUPPORTED_MODES}.'
+                f'Cannot calculate PSNR for {image.mode} image mode. '
+                f'Supported image modes are: {PSNR_SUPPORTED_MODES}.'
             )
 
     if image1.mode != image2.mode:
@@ -67,8 +68,8 @@ def _psnr(image1: PIL.Image.Image, image2: PIL.Image.Image) -> float:
             f'Left image has size {image1.size}, but right image has size {image2.size}.'
         )
 
-    a1 = np.asarray(image1)
-    a2 = np.asarray(image2)
+    a1 = np.asarray(image1).astype(int)
+    a2 = np.asarray(image2).astype(int)
 
     if len(a1.shape) == 2:
         height, width = a1.shape
@@ -83,7 +84,6 @@ def _psnr(image1: PIL.Image.Image, image2: PIL.Image.Image) -> float:
         return float('inf')
 
     max_square_error_sum = N * (2 ** depth - 1) ** 2
-
     return 10 * math.log10(max_square_error_sum / square_error_sum)
 
 
@@ -95,13 +95,13 @@ def to_grayscale(image_state: ImageState, method: str) -> ImageState:
 TO_GRAYSCALE_METHODS = ['mean', 'CCIR 601-1']
 
 
-def _to_grayscale(image: PIL.Image.Image, method: str) -> PIL.Image.Image:
+def _to_grayscale(image: Image, method: str) -> Image:
     if image.mode == 'L':
         return image
 
     if image.mode != 'RGB':
         raise ValueError(
-            'Cannot convert image in mode {image.mode} to grayscale. '
+            f'Cannot convert image in mode {image.mode} to grayscale. '
             'Image mode must be RGB.'
         )
 
@@ -115,19 +115,124 @@ def _to_grayscale(image: PIL.Image.Image, method: str) -> PIL.Image.Image:
     return _to_grayscale_ccir601(image)
 
 
-def _to_grayscale_mean(image: PIL.Image.Image) -> PIL.Image.Image:
-    array = np.asarray(image)
+def _to_grayscale_mean(image: Image) -> Image:
+    array = np.asarray(image).astype(int)
     grayscale_array = (array.sum(axis=2) / 3).astype(np.uint8)
     grayscale_image = PIL.Image.fromarray(grayscale_array, mode='L')
-    grayscale_image.filename = image.filename
     return grayscale_image
 
 
-def _to_grayscale_ccir601(image: PIL.Image.Image) -> PIL.Image.Image:
+def _to_grayscale_ccir601(image: Image) -> Image:
     array = np.asarray(image).astype(int)
     grayscale_array = ((77 * array[:,:,0] + 150 * array[:,:,1] + 29 * array[:,:,2]) / 256).astype(np.uint8)
     grayscale_image = PIL.Image.fromarray(grayscale_array, mode='L')
-    grayscale_image.filename = image.filename
     return grayscale_image
+
+
+def rgb_to_ycbcr(image_state: ImageState) -> ImageState:
+    image = _rgb_to_ycbcr(image_state.real_image)
+    y_as_grayscale_image = _ycbcr_channel_as_grayscale_image(image, channel='Y')
+    return ImageState(real_image=image, visible_image=y_as_grayscale_image)
+
+
+def _rgb_to_ycbcr(image: Image) -> Image:
+    if image.mode == 'YCbCr':
+        return image
+
+    if image.mode != 'RGB':
+        raise ValueError(
+            'Image has to be in RGB mode to be converted to YCbCr. '
+            f'Now it\'s in {image.mode} mode.'
+        )
+
+    array = np.asarray(image).astype(float)
+    y = (77 * array[:,:,0] + 150 * array[:,:,1] + 29 * array[:,:,2]) / 256
+    cb = 144 * (array[:,:,2] - y) / 256 + 128
+    cr = 183 * (array[:,:,0] - y) / 256 + 128
+
+    ycbcr_array = np.around(np.stack((y, cb, cr), axis=2))
+    # ycbcr_array[ycbcr_array<np.zeros(ycbcr_array.shape)] = 0
+    # ycbcr_array[ycbcr_array>255*np.ones(ycbcr_array.shape)] = 255
+
+    ycbcr_image = PIL.Image.fromarray(ycbcr_array.astype(np.uint8), mode='YCbCr')
+    return ycbcr_image
+
+
+def ycbcr_channel_as_grayscale_image(image_state: ImageState, channel: str) -> ImageState:
+    return ImageState(
+        real_image=image_state.real_image,
+        visible_image=_ycbcr_channel_as_grayscale_image(
+            image_state.real_image,
+            channel=channel
+        )
+    )
+
+
+YCBCR_CHANNELS = ['Y', 'Cb', 'Cr']
+
+
+def _ycbcr_channel_as_grayscale_image(image: Image, channel: str) -> Image:
+    if image.mode != 'YCbCr':
+        raise ValueError(
+            'Image has to be in YCbCr mode to get channels as grayscale images. '
+            f'Now it\'s in {image.mode} mode.'
+    )
+    if channel not in YCBCR_CHANNELS:
+        raise ValueError(
+            f'Wrong YCbCr channel {channel}. '
+            f'Must be one of these: {YCBCR_CHANNELS}'
+    )
+
+    if channel == 'Y':
+        component = 0
+    elif channel == 'Cb':
+        component = 1
+    elif channel == 'Cr':
+        component = 2
+
+    array = np.asarray(image)
+    return _array_as_grayscale_image(array[:,:,component])
+
+
+def _array_as_grayscale_image(array: np.ndarray):
+    return PIL.Image.fromarray(array, mode='L')
+
+
+def ycbcr_to_rgb(image_state: ImageState) -> ImageState:
+    image = _ycbcr_to_rgb(image_state.real_image)
+    return ImageState(real_image=image, visible_image=image)
+
+
+def _ycbcr_to_rgb(image: Image) -> Image:
+    if image.mode == 'RGB':
+        return image
+
+    if image.mode != 'YCbCr':
+        raise ValueError(
+            'Image has to be in YCbCr mode to be converted to RGB. '
+            f'Now it\'s in {image.mode} mode.'
+        )
+
+    array = np.asarray(image).astype(float)
+    height, width, _ = array.shape
+    shift_array = np.stack((
+        np.zeros((height, width)),
+        -128*np.ones((height, width)),
+        -128*np.ones((height, width)),
+    ), axis=2)
+    shifted_array = array + shift_array
+
+    r = shifted_array[:,:,0] + (256/183) * shifted_array[:,:,2]
+    g = shifted_array[:,:,0] - (5329/15481) * shifted_array[:,:,1] - (11103/15481) * shifted_array[:,:,2]
+    b = shifted_array[:,:,0] + (256/144) * shifted_array[:,:,1]
+
+    rgb_array = np.around(np.stack((r, g, b), axis=2))
+    rgb_array[rgb_array<np.zeros(rgb_array.shape)] = 0
+    rgb_array[rgb_array>255*np.ones(rgb_array.shape)] = 255
+
+    rgb_image = PIL.Image.fromarray(rgb_array.astype(np.uint8), mode='RGB')
+    return rgb_image
+
+
 
 
