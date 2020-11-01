@@ -13,10 +13,37 @@ class ImageState:
     real_image: Image
 
 
+class ImageValueError(ValueError):
+    """
+    This exception indicates that something is wrong
+    with the image(s) passed as an input.
+    """
+    pass
+
+
+SUPPORTED_UPLOAD_FORMATS = ['PNG', 'BMP', 'TIFF', 'JPEG']
+
+
 def upload_image(filepath: str) -> ImageState:
-    image = PIL.Image.open(filepath)
-    image_state = ImageState(visible_image=image, real_image=image)
-    return image_state
+    image = _upload_image(filepath)
+    return ImageState(visible_image=image, real_image=image)
+
+
+def _upload_image(filepath: str) -> Image:
+    try:
+        image =  PIL.Image.open(filepath)
+    except (OSError, PIL.UnidentifiedImageError):
+        raise ValueError(
+            'Cannot open the image. '
+            f'Ensure that the image format is one of these: {SUPPORTED_UPLOAD_FORMATS}.'
+        )
+
+    if image.format not in SUPPORTED_UPLOAD_FORMATS:
+        raise ValueError(
+            f'Unsupported image format: {image.format}. '
+            f'Image format must be one of these: {SUPPORTED_UPLOAD_FORMATS}.'
+    )
+    return image
 
 
 def image_filename(image_state: ImageState) -> str:
@@ -33,8 +60,19 @@ def _image_to_bytes(image: Image) -> bytes:
     return bio.getvalue()
 
 
-def save_image(filepath: str, image_state: ImageState) -> None:
-    image = image_state.real_image
+SAVE_SUPPORTED_MODES = ['L', 'RGB']
+
+
+def save_image(image_state: ImageState, filepath: str) -> None:
+    _save_image(image_state.real_image, filepath)
+
+
+def _save_image(image: Image, filepath: str) -> None:
+    if image.mode not in SAVE_SUPPORTED_MODES:
+        raise ImageValueError(
+            f'Cannot save image in {image.mode} mode. '
+            f'Supported modes are: {SAVE_SUPPORTED_MODES}.'
+    )
     image.save(filepath, 'PNG')
 
 
@@ -52,18 +90,18 @@ def psnr(image_state1: ImageState, image_state2: ImageState) -> float:
 def _psnr(image1: Image, image2: Image) -> float:
     for image in (image1, image2):
         if image.mode not in {'L', 'RGB'}:
-            raise ValueError(
+            raise ImageValueError(
                 f'Cannot calculate PSNR for {image.mode} image mode. '
                 f'Supported image modes are: {PSNR_SUPPORTED_MODES}.'
             )
 
     if image1.mode != image2.mode:
-        raise ValueError(
+        raise ImageValueError(
             'Cannot calculate PSNR for images of different modes. '
             f'Left image has mode {image1.mode}, but right image has mode {image2.mode}.'
         )
     if image1.size != image2.size:
-        raise ValueError(
+        raise ImageValueError(
             'Cannot calculate PSNR for images of different sizes. '
             f'Left image has size {image1.size}, but right image has size {image2.size}.'
         )
@@ -87,12 +125,12 @@ def _psnr(image1: Image, image2: Image) -> float:
     return 10 * math.log10(max_square_error_sum / square_error_sum)
 
 
+TO_GRAYSCALE_METHODS = ['mean', 'CCIR 601-1']
+
+
 def to_grayscale(image_state: ImageState, method: str) -> ImageState:
     image = _to_grayscale(image_state.real_image, method=method)
     return ImageState(visible_image=image, real_image=image)
-
-
-TO_GRAYSCALE_METHODS = ['mean', 'CCIR 601-1']
 
 
 def _to_grayscale(image: Image, method: str) -> Image:
@@ -100,7 +138,7 @@ def _to_grayscale(image: Image, method: str) -> Image:
         return image
 
     if image.mode != 'RGB':
-        raise ValueError(
+        raise ImageValueError(
             f'Cannot convert image in mode {image.mode} to grayscale. '
             'Image mode must be RGB.'
         )
@@ -140,7 +178,7 @@ def _rgb_to_ycbcr(image: Image) -> Image:
         return image
 
     if image.mode != 'RGB':
-        raise ValueError(
+        raise ImageValueError(
             'Image has to be in RGB mode to be converted to YCbCr. '
             f'Now it\'s in {image.mode} mode.'
         )
@@ -158,6 +196,9 @@ def _rgb_to_ycbcr(image: Image) -> Image:
     return ycbcr_image
 
 
+YCBCR_CHANNELS = ['Y', 'Cb', 'Cr']
+
+
 def ycbcr_channel_as_grayscale_image(image_state: ImageState, channel: str) -> ImageState:
     return ImageState(
         real_image=image_state.real_image,
@@ -168,17 +209,14 @@ def ycbcr_channel_as_grayscale_image(image_state: ImageState, channel: str) -> I
     )
 
 
-YCBCR_CHANNELS = ['Y', 'Cb', 'Cr']
-
-
 def _ycbcr_channel_as_grayscale_image(image: Image, channel: str) -> Image:
     if image.mode != 'YCbCr':
-        raise ValueError(
+        raise ImageValueError(
             'Image has to be in YCbCr mode to get channels as grayscale images. '
             f'Now it\'s in {image.mode} mode.'
     )
     if channel not in YCBCR_CHANNELS:
-        raise ValueError(
+        raise ImageValueError(
             f'Wrong YCbCr channel {channel}. '
             f'Must be one of these: {YCBCR_CHANNELS}'
     )
@@ -208,7 +246,7 @@ def _ycbcr_to_rgb(image: Image) -> Image:
         return image
 
     if image.mode != 'YCbCr':
-        raise ValueError(
+        raise ImageValueError(
             'Image has to be in YCbCr mode to be converted to RGB. '
             f'Now it\'s in {image.mode} mode.'
         )

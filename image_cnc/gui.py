@@ -4,6 +4,7 @@ import os.path
 import PySimpleGUI as sg
 
 import core
+from core import ImageValueError
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -25,7 +26,6 @@ def main():
     # handle events
     while True:
         event, values = window.read()
-        print(event, values)
 
         if event == sg.WIN_CLOSED:
             break
@@ -40,33 +40,54 @@ def main():
 
         # image1 events
         if event == 'upload_image1_filepath':
-            image1 = core.upload_image(values['upload_image1_filepath'])
-            window['image1_element'].update(data=core.image_to_bytes(image1), size=IMAGE_SIZE)
+            try:
+                image1 = core.upload_image(values['upload_image1_filepath'])
+            except ValueError as e:
+                sg.popup(e.args[0])
+                continue
+
+            update_image_element(window, 'image1_element', image1)
 
             # update working image
             if values['working_image_dropdown'] == 'left':
                 working_image = image1
         elif event == 'save_as_image1_dummy_input':
             filepath = values['save_as_image1_dummy_input']
-            core.save_image(filepath, image1)
+            if filepath == '':
+                continue
+            try:
+                core.save_image(image1, filepath)
+            except ImageValueError as e:
+                sg.popup(e.args[0])
+                continue
 
         # image2 events
         elif event == 'upload_image2_filepath':
-            image2 = core.upload_image(values['upload_image2_filepath'])
-            window['image2_element'].update(data=core.image_to_bytes(image2), size=IMAGE_SIZE)
+            try:
+                image2 = core.upload_image(values['upload_image2_filepath'])
+            except ValueError as e:
+                sg.popup(e.args[0])
+                continue
+            update_image_element(window, 'image2_element', image2)
 
             # update working image
             if values['working_image_dropdown'] == 'right':
                 working_image = image2
         elif event == 'save_as_image2_dummy_input':
             filepath = values['save_as_image2_dummy_input']
-            core.save_image(filepath, image2)
+            if filepath == '':
+                continue
+            try:
+                core.save_image(image2, filepath)
+            except ImageValueError as e:
+                sg.popup(e.args[0])
+                continue
 
         # comparison events
         elif event == 'calculate_psnr_button':
             try:
                 psnr = core.psnr(image1, image2)
-            except ValueError as e:
+            except ImageValueError as e:
                 sg.popup(e.args[0])
                 continue
 
@@ -79,35 +100,53 @@ def main():
         # instruments events
         elif event == 'convert_to_grayscale_button':
             method = values['convert_to_grayscale_method_dropdown']
-            working_image = core.to_grayscale(working_image, method=method)
-            window[working_image_element_key].update(
-                data=core.image_to_bytes(working_image), size=IMAGE_SIZE
-            )
+            try:
+                working_image = core.to_grayscale(working_image, method=method)
+            except ImageValueError as e:
+                sg.popup(e.args[0])
+                continue
+
+            update_image_element(window, working_image_element_key, working_image)
         elif event == 'rgb_to_ycbcr_button':
-            working_image = core.rgb_to_ycbcr(working_image)
-            window[working_image_element_key].update(
-                data=core.image_to_bytes(working_image), size=IMAGE_SIZE
-            )
+            try:
+                working_image = core.rgb_to_ycbcr(working_image)
+            except ImageValueError as e:
+                sg.popup(e.args[0])
+                continue
+
+            update_image_element(window, working_image_element_key, working_image)
         elif event == 'y_button':
-            working_image = core.ycbcr_channel_as_grayscale_image(working_image, channel='Y')
-            window[working_image_element_key].update(
-                data=core.image_to_bytes(working_image), size=IMAGE_SIZE
-            )
+            try:
+                working_image = core.ycbcr_channel_as_grayscale_image(working_image, channel='Y')
+            except ImageValueError as e:
+                sg.popup(e.args[0])
+                continue
+
+            update_image_element(window, working_image_element_key, working_image)
         elif event == 'cb_button':
-            working_image = core.ycbcr_channel_as_grayscale_image(working_image, channel='Cb')
-            window[working_image_element_key].update(
-                data=core.image_to_bytes(working_image), size=IMAGE_SIZE
-            )
+            try:
+                working_image = core.ycbcr_channel_as_grayscale_image(working_image, channel='Cb')
+            except ImageValueError as e:
+                sg.popup(e.args[0])
+                continue
+
+            update_image_element(window, working_image_element_key, working_image)
         elif event == 'cr_button':
-            working_image = core.ycbcr_channel_as_grayscale_image(working_image, channel='Cr')
-            window[working_image_element_key].update(
-                data=core.image_to_bytes(working_image), size=IMAGE_SIZE
-            )
+            try:
+                working_image = core.ycbcr_channel_as_grayscale_image(working_image, channel='Cr')
+            except ImageValueError as e:
+                sg.popup(e.args[0])
+                continue
+
+            update_image_element(window, working_image_element_key, working_image)
         elif event == 'ycbcr_to_rgb_button':
-            working_image = core.ycbcr_to_rgb(working_image)
-            window[working_image_element_key].update(
-                data=core.image_to_bytes(working_image), size=IMAGE_SIZE
-            )
+            try:
+                working_image = core.ycbcr_to_rgb(working_image)
+            except ImageValueError as e:
+                sg.popup(e.args[0])
+                continue
+
+            update_image_element(window, working_image_element_key, working_image)
 
         # if working image has changed, update left or right image accordingly
         if values['working_image_dropdown'] == 'left':
@@ -219,3 +258,9 @@ def setup_comparison_frame():
     comparison_frame = sg.Frame('', comparison_frame_layout)
 
     return comparison_frame
+
+
+def update_image_element(window, image_element_key, image):
+    window[image_element_key].update(
+        data=core.image_to_bytes(image), size=IMAGE_SIZE
+    )

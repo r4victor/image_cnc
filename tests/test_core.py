@@ -62,6 +62,46 @@ def black512ycbcr_image():
     return black_image
 
 
+# test upload image
+
+def test_upload_png():
+    filepath = os.path.join(IMAGE_DIR, 'image_Peppers512rgb.png')
+    _test_upload(filepath)
+
+
+def test_upload_bmp():
+    filepath = os.path.join(IMAGE_DIR, 'boy.bmp')
+    _test_upload(filepath)
+
+
+def test_upload_tif():
+    filepath = os.path.join(IMAGE_DIR, 'cameraman.tif')
+    _test_upload(filepath)
+
+
+def test_upload_jpeg():
+    filepath = os.path.join(IMAGE_DIR, 'lena.jpg')
+    _test_upload(filepath)
+
+
+def _test_upload(filepath):
+    image_state = core.upload_image(filepath)
+    assert image_state.real_image is not None
+    assert image_state.visible_image is not None
+
+
+def test_upload_no_such_file():
+    filepath = os.path.join(IMAGE_DIR, '32asdfkkpopoksapokp.png')
+    with pytest.raises(ValueError):
+        core.upload_image(filepath)
+
+
+def test_upload_not_image():
+    filepath = os.path.join(IMAGE_DIR, 'not_image.txt')
+    with pytest.raises(ValueError):
+        core.upload_image(filepath)
+
+
 # test psnr
 
 def test_psnr_same_image(peppers512rgb_image):
@@ -106,7 +146,7 @@ def test_rgb_ycbcr_back_and_forth(peppers512rgb_image):
     image = peppers512rgb_image
     ycbcr_image = core._rgb_to_ycbcr(image)
     rgb_image = core._ycbcr_to_rgb(ycbcr_image)
-    # allow pixels to differ no more than 1 bit
+    # allow pixels to differ no more than by 1
     np.testing.assert_allclose(
         np.asarray(image, dtype=float),
         np.asarray(rgb_image, dtype=float),
