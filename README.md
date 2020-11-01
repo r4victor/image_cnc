@@ -2,6 +2,10 @@
 
 Image C&C (stands for Compress and Compare) is a GUI tool that allows to upload images, modify them and compare the effects of modifications visually and numerically.
 
+Here's how it looks at the moment:
+
+![Window image](window.png)
+
 ## Requirements
 
 * Python >= 3.8
