@@ -60,6 +60,10 @@ def main():
             except ImageValueError as e:
                 sg.popup(e.args[0])
                 continue
+        elif event == 'copy_image1_button':
+            image1 = image2
+            update_image_element(window, 'image1_element', image1)
+            continue
 
         # image2 events
         elif event == 'upload_image2_filepath':
@@ -82,6 +86,10 @@ def main():
             except ImageValueError as e:
                 sg.popup(e.args[0])
                 continue
+        elif event == 'copy_image2_button':
+            image2 = image1
+            update_image_element(window, 'image2_element', image2)
+            continue
 
         # comparison events
         elif event == 'calculate_psnr_button':
@@ -147,6 +155,16 @@ def main():
                 continue
 
             update_image_element(window, working_image_element_key, working_image)
+        elif event == 'quantize_button':
+            working_image = core.quantize(
+                working_image,
+                channel1_depth=values['quantize_channel_1_input'],
+                channel2_depth=values['quantize_channel_2_input'],
+                channel3_depth=values['quantize_channel_3_input'],
+            )
+
+            update_image_element(window, working_image_element_key, working_image)
+
 
         # if working image has changed, update left or right image accordingly
         if values['working_image_dropdown'] == 'left':
@@ -191,9 +209,16 @@ def setup_image_frame(image_name, default_image):
         'Save as', key=f'save_as_{image_name}_button',
         enable_events=True
     )
+
+    copy_image_button_text = 'Copy image from the right'
+    if image_name == 'image2':
+        copy_image_button_text = 'Copy image from the left'
+    copy_image_button = sg.Button(copy_image_button_text, key=f'copy_{image_name}_button')
+
     image_frame_layout = [
         [image_element],
-        [upload_image_filepath, upload_image_button, save_as_image_dummy_input, save_as_image_button]
+        [upload_image_filepath, upload_image_button, save_as_image_dummy_input, save_as_image_button],
+        [copy_image_button]
     ]
     image_frame = sg.Frame('', image_frame_layout)
     return image_frame
@@ -207,6 +232,7 @@ def setup_instruments_frame():
         , pad=(0, 10)
     )
 
+    # Grayscale conversion
     convert_to_grayscale_button = sg.Button(
         'Convert to grayscale', key='convert_to_grayscale_button'
     )
@@ -220,6 +246,7 @@ def setup_instruments_frame():
         [convert_to_grayscale_text, convert_to_grayscale_method_dropdown],
     ], pad=(0, 10))
 
+    # RGB <-> YCbCr
     rgb_to_ycbcr_button = sg.Button(
         'Convert RGB to YCbCr', key='rgb_to_ycbcr_button'
     )
@@ -235,10 +262,44 @@ def setup_instruments_frame():
         [ycbcr_to_rgb_button]
     ], pad=(0, 10))
 
+    # Quantization
+    quantize_values = list(range(9))
+    quantize_default_value = 8
+    quantize_channel_1_text = sg.Text('Channel1 (R):')
+    quantize_channel_1_input = sg.Combo(
+        quantize_values, default_value=quantize_default_value,
+        key='quantize_channel_1_input', auto_size_text=True,
+    )
+    quantize_channel_1_bits_text = sg.Text('bits')
+
+    quantize_channel_2_text = sg.Text('Channel2 (G):')
+    quantize_channel_2_input = sg.Combo(
+        quantize_values, default_value=quantize_default_value,
+        key='quantize_channel_2_input', auto_size_text=True,
+    )
+    quantize_channel_2_bits_text = sg.Text('bits')
+
+    quantize_channel_3_text = sg.Text('Channel3 (B):')
+    quantize_channel_3_input = sg.Combo(
+        quantize_values, default_value=quantize_default_value,
+        key='quantize_channel_3_input', auto_size_text=True,
+    )
+    quantize_channel_3_bits_text = sg.Text('bits')
+
+    quantize_button = sg.Button('Quantize', key='quantize_button')
+
+    quantize_column = sg.Column([
+        [quantize_channel_1_text, quantize_channel_1_input, quantize_channel_1_bits_text],
+        [quantize_channel_2_text, quantize_channel_2_input, quantize_channel_2_bits_text],
+        [quantize_channel_3_text, quantize_channel_3_input, quantize_channel_3_bits_text],
+        [quantize_button]
+    ], pad=(0, 10))
+
     instruments_frame_layout = [
         [working_image_text, working_image_dropdown],
         [convert_to_grayscale_column],
-        [ycbcr_column]
+        [ycbcr_column],
+        [quantize_column]
     ]
     instruments_frame = sg.Frame('', instruments_frame_layout)
 

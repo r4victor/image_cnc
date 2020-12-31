@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 import io
 import math
+from typing import Union
 
 import numpy as np
 import PIL.Image
 from PIL.Image import Image
+
 
 
 @dataclass
@@ -272,5 +274,67 @@ def _ycbcr_to_rgb(image: Image) -> Image:
     return rgb_image
 
 
+QUANTIZE_SUPPORTED_MODES = ['RGB', 'YCbCr']
+MAX_CHANNEL_DEPTH = 8
+ALLOWED_CHANNEL_DEPTHS = list(range(9))
 
 
+def quantize(
+    image_state:
+    ImageState,
+    channel1_depth: Union[str, int],
+    channel2_depth: Union[str, int],
+    channel3_depth: Union[str, int]
+) -> ImageState:
+    image = _quantize(
+        image_state.real_image,
+        channel1_depth=channel1_depth,
+        channel2_depth=channel2_depth,
+        channel3_depth=channel3_depth
+    )
+    if image.mode == 'YCbCr':
+        y_as_grayscale_image = _ycbcr_channel_as_grayscale_image(image, channel='Y')
+        return ImageState(visible_image=y_as_grayscale_image, real_image=image)
+
+    return ImageState(visible_image=image, real_image=image)
+
+
+def _quantize(
+    image: Image,
+    channel1_depth: Union[str, int],
+    channel2_depth: Union[str, int],
+    channel3_depth: Union[str, int]
+) -> Image:
+    if image.mode not in QUANTIZE_SUPPORTED_MODES:
+        raise ImageValueError(
+            f'Image must be in one of these modes to be quantized: {QUANTIZE_SUPPORTED_MODES}. '
+            f'Now it\'s in the {image.mode} mode'
+        )
+
+    array = np.asarray(image).astype(np.uint8)
+    channel1 = _quantize_channel(array[:,:,0], channel1_depth)
+    channel2 = _quantize_channel(array[:,:,1], channel2_depth)
+    channel3 = _quantize_channel(array[:,:,2], channel3_depth)
+
+    array = np.stack((channel1, channel2, channel3), axis=2)
+ 
+    return PIL.Image.fromarray(array, mode=image.mode)
+
+
+
+def _quantize_channel(channel: np.ndarray, channel_depth: Union[str, int]):
+    try:
+        channel_depth = int(channel_depth)
+    except ValueError:
+        raise ValueError('Channel depth must be an integer value between 0 and 8.')
+
+    if channel_depth not in ALLOWED_CHANNEL_DEPTHS:
+        raise ValueError('Channel depth must be an integer value between 0 and 8')
+
+    if channel_depth == MAX_CHANNEL_DEPTH:
+        return channel
+
+    bits_to_drop = 8 - channel_depth
+    shift = 2 ** (bits_to_drop - 1)
+    # mask = 1 << bits_to_drop
+    return (channel >> bits_to_drop << bits_to_drop) + shift

@@ -200,3 +200,64 @@ def test_black_to_rgb(black512ycbcr_image):
     np.testing.assert_array_equal(r, expected_r)
     np.testing.assert_array_equal(g, expected_g)
     np.testing.assert_array_equal(b, expected_b)
+
+
+def test_quantize_0_bits(peppers512rgb_image):
+    image = peppers512rgb_image
+    quantized_image = core._quantize(
+        image,
+        channel1_depth=0,
+        channel2_depth=0,
+        channel3_depth=0
+    )
+    array = np.asarray(quantized_image)
+    expected_array = 128 * np.ones((512, 512, 3), dtype=np.uint8)
+    np.testing.assert_array_equal(array, expected_array)
+
+
+def test_quantize_max_bits(peppers512rgb_image):
+    image = peppers512rgb_image
+    quantized_image = core._quantize(
+        image,
+        channel1_depth=8,
+        channel2_depth=8,
+        channel3_depth=8
+    )
+    array = np.asarray(quantized_image)
+    expected_array = np.asarray(image)
+    np.testing.assert_array_equal(array, expected_array)
+
+
+def test_quantize_string_channel_depth(peppers512rgb_image):
+    image = peppers512rgb_image
+    quantized_image = core._quantize(
+        image,
+        channel1_depth='3',
+        channel2_depth=8,
+        channel3_depth=8
+    )
+
+
+@pytest.mark.parametrize('channel_depth', ['asd', '', 9])
+def test_quantize_wrong_channel_depth(peppers512rgb_image, channel_depth):
+    image = peppers512rgb_image
+    with pytest.raises(ValueError):
+        quantized_image = core._quantize(
+            image,
+            channel1_depth=channel_depth,
+            channel2_depth=8,
+            channel3_depth=8
+        )
+
+
+def test_quantize_ycbcr_viewed_as_grayscale(black512ycbcr_image):
+    image = black512ycbcr_image
+    quantized_image = core.quantize(
+        core.ImageState(image, image),
+        channel1_depth=8,
+        channel2_depth=8,
+        channel3_depth=8
+    )
+    assert quantized_image.real_image.mode == 'YCbCr'
+    assert quantized_image.visible_image.mode == 'L'
+
