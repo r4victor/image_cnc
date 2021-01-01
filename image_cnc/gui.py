@@ -115,6 +115,7 @@ def main():
                 continue
 
             update_image_element(window, working_image_element_key, working_image)
+
         elif event == 'rgb_to_ycbcr_button':
             try:
                 working_image = core.rgb_to_ycbcr(working_image)
@@ -123,6 +124,7 @@ def main():
                 continue
 
             update_image_element(window, working_image_element_key, working_image)
+
         elif event == 'y_button':
             try:
                 working_image = core.ycbcr_channel_as_grayscale_image(working_image, channel='Y')
@@ -131,6 +133,7 @@ def main():
                 continue
 
             update_image_element(window, working_image_element_key, working_image)
+
         elif event == 'cb_button':
             try:
                 working_image = core.ycbcr_channel_as_grayscale_image(working_image, channel='Cb')
@@ -139,6 +142,7 @@ def main():
                 continue
 
             update_image_element(window, working_image_element_key, working_image)
+
         elif event == 'cr_button':
             try:
                 working_image = core.ycbcr_channel_as_grayscale_image(working_image, channel='Cr')
@@ -147,6 +151,7 @@ def main():
                 continue
 
             update_image_element(window, working_image_element_key, working_image)
+
         elif event == 'ycbcr_to_rgb_button':
             try:
                 working_image = core.ycbcr_to_rgb(working_image)
@@ -155,16 +160,42 @@ def main():
                 continue
 
             update_image_element(window, working_image_element_key, working_image)
+
         elif event == 'quantize_button':
-            working_image = core.quantize(
-                working_image,
-                channel1_depth=values['quantize_channel_1_input'],
-                channel2_depth=values['quantize_channel_2_input'],
-                channel3_depth=values['quantize_channel_3_input'],
-            )
+            try:
+                working_image = core.quantize(
+                    working_image,
+                    channel1_depth=values['quantize_channel_1_input'],
+                    channel2_depth=values['quantize_channel_2_input'],
+                    channel3_depth=values['quantize_channel_3_input'],
+                )
+            except (ImageValueError, ValueError) as e:
+                sg.popup(e.args[0])
+                continue
 
             update_image_element(window, working_image_element_key, working_image)
 
+        elif event == 'kmeans_button':
+            try:
+                working_image = core.kmeans(
+                    working_image, palette_size=values['palette_size_input']
+                )
+            except (ImageValueError, ValueError) as e:
+                sg.popup(e.args[0])
+                continue
+            
+            update_image_element(window, working_image_element_key, working_image)
+
+        elif event == 'median_cut_button':
+            try:
+                working_image = core.median_cut(
+                    working_image, palette_size=values['palette_size_input']
+                )
+            except (ImageValueError, ValueError) as e:
+                sg.popup(e.args[0])
+                continue
+            
+            update_image_element(window, working_image_element_key, working_image)
 
         # if working image has changed, update left or right image accordingly
         if values['working_image_dropdown'] == 'left':
@@ -295,11 +326,24 @@ def setup_instruments_frame():
         [quantize_button]
     ], pad=(0, 10))
 
+    palette_size_text = sg.Text('Palette size:')
+    palette_size_input = sg.Combo(
+        [256, 512, 1024], default_value=256,
+        key='palette_size_input'
+    )
+    palette_size_colors_text = sg.Text('colors')
+    kmeans_button = sg.Button('k-means', key='kmeans_button')
+    median_cut_button = sg.Button('Median cut', key='median_cut_button')
+
+
     instruments_frame_layout = [
         [working_image_text, working_image_dropdown],
         [convert_to_grayscale_column],
         [ycbcr_column],
-        [quantize_column]
+        [quantize_column],
+        [palette_size_text, palette_size_input, palette_size_colors_text],
+        [kmeans_button],
+        [median_cut_button]
     ]
     instruments_frame = sg.Frame('', instruments_frame_layout)
 

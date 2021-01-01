@@ -261,3 +261,22 @@ def test_quantize_ycbcr_viewed_as_grayscale(black512ycbcr_image):
     assert quantized_image.real_image.mode == 'YCbCr'
     assert quantized_image.visible_image.mode == 'L'
 
+
+@pytest.mark.slow
+def test_kmeans_palette_size(peppers512rgb_image):
+    image = peppers512rgb_image
+    palette_size = 32
+    quantized_image = core._kmeans(image, palette_size=palette_size)
+    array = np.asarray(quantized_image)
+    distinct_colors, _ = np.unique(array.reshape(-1, 3), axis=0).shape
+    assert distinct_colors == palette_size
+
+
+@pytest.mark.slow
+def test_median_cut_palette_size(peppers512rgb_image):
+    image = peppers512rgb_image
+    palette_size = 32
+    quantized_image = core._median_cut(image, palette_size=palette_size)
+    array = np.asarray(quantized_image)
+    distinct_colors, _ = np.unique(array.reshape(-1, 3), axis=0).shape
+    assert distinct_colors == palette_size
