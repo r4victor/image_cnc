@@ -10,7 +10,7 @@ import PIL.Image
 CHANNELS_NUM = 3
 
 
-@dataclass(eq=True)
+@dataclass
 class VBox:
     pixels: np.ndarray
     longest_axis: int
@@ -63,7 +63,7 @@ def median_cut(array: np.ndarray, k: int) -> np.ndarray:
         heapq.heappush(vboxes, vbox_1)
         heapq.heappush(vboxes, vbox_2)
 
-    centroids = np.asarray([vbox.centroid() for vbox in vboxes]).astype(float)
+    centroids = np.asarray([vbox.centroid() for vbox in vboxes])
     return centroids
 
 

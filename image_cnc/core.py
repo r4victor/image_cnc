@@ -400,7 +400,7 @@ def _median_cut(image: Image, palette_size: Union[str, int]) -> Image:
     palette_size = _validated_palette_size(palette_size)
 
     # find centroids
-    array = np.asarray(image).astype(np.uint8)
+    array = np.asarray(image)
     centroids = median_cut_algorithm(array, k=palette_size)
 
     # map pixels to centroids
