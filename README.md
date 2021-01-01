@@ -30,7 +30,7 @@ $ pip install -r requirements.txt
 
 That's it. Now you can run a program:
 ```text
-$ python image_cnc
+$ python -m image_cnc
 ```
 
 ## Running tests

@@ -3,8 +3,8 @@ import os.path
 
 import PySimpleGUI as sg
 
-import core
-from core import ImageValueError
+from image_cnc import core
+from image_cnc.core import ImageValueError
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -191,7 +191,7 @@ def main():
                 working_image = core.median_cut(
                     working_image, palette_size=values['palette_size_input']
                 )
-            except (ImageValueError, ValueError) as e:
+            except (ImageValueError) as e:
                 sg.popup(e.args[0])
                 continue
             

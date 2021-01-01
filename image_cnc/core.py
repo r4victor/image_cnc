@@ -6,8 +6,10 @@ from typing import Union
 import numpy as np
 import PIL.Image
 from PIL.Image import Image
-from scipy.cluster.vq import kmeans2
+from scipy.cluster.vq import kmeans2, vq
 
+
+from image_cnc.algorithms.median_cut import median_cut as median_cut_algorithm
 
 
 @dataclass
@@ -322,7 +324,7 @@ def _quantize(
     return PIL.Image.fromarray(array, mode=image.mode)
 
 
-def _quantize_channel(channel: np.ndarray, channel_depth: Union[str, int]):
+def _quantize_channel(channel: np.ndarray, channel_depth: Union[str, int]) -> np.ndarray:
     try:
         channel_depth = int(channel_depth)
     except ValueError:
@@ -343,12 +345,12 @@ def _quantize_channel(channel: np.ndarray, channel_depth: Union[str, int]):
 MAX_PALETTE_SIZE = 1024
 
 
-def kmeans(image_state: ImageState, palette_size: Union[str, int]):
+def kmeans(image_state: ImageState, palette_size: Union[str, int]) -> ImageState:
     image = _kmeans(image_state.real_image, palette_size=palette_size)
     return ImageState(visible_image=image, real_image=image)
 
 
-def _kmeans(image: Image, palette_size: Union[str, int]):
+def _kmeans(image: Image, palette_size: Union[str, int]) -> Image:
     if image.mode != 'RGB':
         raise ImageValueError(
             'Image must be in the RBG mode to apply the k-means quantization. '
@@ -362,17 +364,12 @@ def _kmeans(image: Image, palette_size: Union[str, int]):
     N = width * height
     pixels = array.reshape(N, 3)
     centroid, label = kmeans2(pixels, k=palette_size, iter=20, minit='points')
-    centroid_array = np.around(centroid[label, :])
-    centroid_array[centroid_array<np.zeros(centroid_array.shape)] = 0
-    centroid_array[centroid_array>255*np.ones(centroid_array.shape)] = 255
-    centroid_array = centroid_array.astype(np.uint8)
 
-    quantized_array = centroid_array.reshape(width, height, 3)
-
+    quantized_array = _round_array(centroid[label, :]).reshape(width, height, 3)
     return PIL.Image.fromarray(quantized_array, mode=image.mode)
 
 
-def _validated_palette_size(palette_size: Union[str, int]):
+def _validated_palette_size(palette_size: Union[str, int]) -> int:
     try:
         palette_size = int(palette_size)
     except ValueError:
@@ -388,12 +385,12 @@ def _validated_palette_size(palette_size: Union[str, int]):
     return palette_size
 
 
-def median_cut(image_state: ImageState, palette_size: Union[str, int]):
+def median_cut(image_state: ImageState, palette_size: Union[str, int]) -> ImageState:
     image = _median_cut(image_state.real_image, palette_size=palette_size)
     return ImageState(visible_image=image, real_image=image)
 
 
-def _median_cut(image: Image, palette_size: Union[str, int]):
+def _median_cut(image: Image, palette_size: Union[str, int]) -> Image:
     if image.mode != 'RGB':
         raise ImageValueError(
             'Image must be in the RBG mode to apply the median cut quantization. '
@@ -402,4 +399,24 @@ def _median_cut(image: Image, palette_size: Union[str, int]):
 
     palette_size = _validated_palette_size(palette_size)
 
-    return image.quantize(colors=palette_size).convert(mode='RGB')
+    # find centroids
+    array = np.asarray(image).astype(np.uint8)
+    centroids = median_cut_algorithm(array, k=palette_size)
+
+    # map pixels to centroids
+    width, height, _ = array.shape
+    N = width * height
+    pixels = array.reshape(N, 3).astype(float)
+    label, _ = vq(pixels, centroids)
+
+    # build image
+    quantized_array = _round_array(centroids[label]).reshape(width, height, 3)
+    return PIL.Image.fromarray(quantized_array, mode='RGB')
+
+    
+
+def _round_array(array: np.ndarray) -> np.ndarray:
+    array = np.around(array)
+    array[array<np.zeros(array.shape)] = 0
+    array[array>255*np.ones(array.shape)] = 255
+    return array.astype(np.uint8)
