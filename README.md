@@ -12,6 +12,7 @@ Here's how it looks at the moment:
 * `NumPy`
 * `Pillow`
 * `PySimpleGUI`
+* `SciPy`
 * `pytest` (optional, to run tests)
 
 ## Installation
